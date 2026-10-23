@@ -39,7 +39,7 @@ cd 5g-handover-simulator
 npm start            # → http://localhost:5173
 ```
 
-You need Node 18+ for the dev server, tests and headless runner. The app itself only needs a browser with WebGL.
+You need Node 20+ for the dev server, tests and headless runner. The app itself only needs a browser with WebGL.
 
 ### Controls
 
