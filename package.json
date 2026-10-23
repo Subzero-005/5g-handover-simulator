@@ -1,0 +1,17 @@
+{
+  "name": "5g-handover-simulator",
+  "version": "1.0.0",
+  "description": "Interactive 3D simulation of a 4G/5G mobile network where virtual phones hand over between LTE, 5G NR and mmWave cells.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Adhiraj Madan",
+  "scripts": {
+    "start": "node scripts/serve.js",
+    "test": "node --test \"tests/*.test.js\"",
+    "sim": "node scripts/run-headless.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": ["5g", "lte", "handover", "mobile-network", "simulation", "threejs", "3gpp", "telecom"]
+}
