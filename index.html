@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HandoverLab · 5G Network Simulator</title>
+    <meta name="description" content="Interactive 3D simulation of a 4G/5G mobile network: virtual phones move through a city and hand over between LTE, 5G NR and mmWave cells." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230b1220'/%3E%3Cpath d='M32 18v30' stroke='%234dd0e1' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M20 22a17 17 0 0 0 0 20M44 22a17 17 0 0 1 0 20' stroke='%23b388ff' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='16' r='5' fill='%23ffb74d'/%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400..600,0..1,0&display=block" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="viewport" aria-label="3D view of the simulated city"></div>
+
+    <div id="loader">
+      <div class="loader-orb">
+        <span></span><span></span><span></span>
+        <div class="loader-core"><span class="ms">cell_tower</span></div>
+      </div>
+      <p>Building the radio network…</p>
+    </div>
+
+    <header class="topbar glass">
+      <div class="brand">
+        <div class="logo"><span class="ms">cell_tower</span></div>
+        <div>
+          <h1>Handover<span>Lab</span></h1>
+          <p>4G / 5G mobility simulator</p>
+        </div>
+      </div>
+
+      <div class="transport">
+        <button id="btn-play" class="icon-btn filled" title="Pause (Space)"><span class="ms">pause</span></button>
+        <button id="btn-step" class="icon-btn" title="Step one tick"><span class="ms">skip_next</span></button>
+        <div class="segmented" id="speed" role="radiogroup" aria-label="Simulation speed">
+          <button data-speed="1" class="active">1×</button>
+          <button data-speed="5">5×</button>
+          <button data-speed="20">20×</button>
+          <button data-speed="60">60×</button>
+        </div>
+        <div class="clock"><span class="ms">schedule</span><span id="clock">00:00.0</span></div>
+      </div>
+
+      <div class="top-actions">
+        <label class="select-wrap" title="Scenario">
+          <span class="ms">map</span>
+          <select id="scenario"></select>
+          <span class="ms caret">expand_more</span>
+        </label>
+        <button id="btn-reset" class="icon-btn" title="Restart scenario"><span class="ms">restart_alt</span></button>
+        <button id="btn-camera" class="icon-btn" title="Reset camera"><span class="ms">3d_rotation</span></button>
+        <button id="btn-help" class="icon-btn" title="How it works"><span class="ms">help</span></button>
+      </div>
+    </header>
+
+    <button class="panel-toggle left" id="toggle-left" title="Controls"><span class="ms">tune</span></button>
+    <button class="panel-toggle right" id="toggle-right" title="Analytics"><span class="ms">monitoring</span></button>
+
+    <aside class="panel left glass" id="panel-left">
+      <section>
+        <h2><span class="ms">swap_calls</span>Handover policy</h2>
+        <div class="formula">
+          <span class="f-n">M<sub>n</sub> + O<sub>cn</sub></span> − Hys &gt; <span class="f-s">M<sub>s</sub> + O<sub>cs</sub></span> + Off
+          <small>A3 event · held for time-to-trigger</small>
+        </div>
+        <div class="field" data-param="a3OffsetDb" data-min="-2" data-max="8" data-step="0.5" data-unit="dB" data-label="A3 offset"></div>
+        <div class="field" data-param="hysteresisDb" data-min="0" data-max="6" data-step="0.5" data-unit="dB" data-label="Hysteresis"></div>
+        <div class="field" data-param="tttMs" data-kind="ttt" data-label="Time-to-trigger"></div>
+        <h3>Cell individual offsets</h3>
+        <div class="field tech-LTE" data-param="cioDb.LTE" data-min="-6" data-max="10" data-step="1" data-unit="dB" data-label="4G LTE"></div>
+        <div class="field tech-NR" data-param="cioDb.NR" data-min="-6" data-max="10" data-step="1" data-unit="dB" data-label="5G NR"></div>
+        <div class="field tech-MMW" data-param="cioDb.MMW" data-min="-6" data-max="10" data-step="1" data-unit="dB" data-label="5G mmWave"></div>
+        <label class="switch-row">
+          <span><strong>Mobility load balancing</strong><small>Bias UEs away from busy cells</small></span>
+          <input type="checkbox" id="mlb" class="switch" />
+        </label>
+      </section>
+
+      <section>
+        <h2><span class="ms">settings_input_antenna</span>Radio environment</h2>
+        <div class="field" data-param="shadowingScale" data-min="0" data-max="2" data-step="0.1" data-unit="×" data-label="Shadow fading"></div>
+        <div class="field" data-param="l3FilterK" data-min="0" data-max="9" data-step="1" data-unit="" data-label="L3 filter k"></div>
+        <div class="field" data-param="t310Ms" data-min="200" data-max="2000" data-step="100" data-unit="ms" data-label="T310 timer"></div>
+        <label class="switch-row">
+          <span><strong>Off-map interference</strong><small>Neighbouring cells outside the city</small></span>
+          <input type="checkbox" id="ext-int" class="switch" checked />
+        </label>
+      </section>
+
+      <section>
+        <h2><span class="ms">groups</span>Traffic</h2>
+        <div class="field" data-kind="ues" data-min="1" data-max="150" data-step="1" data-unit="" data-label="Phones"></div>
+      </section>
+
+      <section>
+        <h2><span class="ms">visibility</span>Display</h2>
+        <div class="segmented wide" id="heatmap-mode" role="radiogroup" aria-label="Coverage map">
+          <button data-mode="off" class="active">No map</button>
+          <button data-mode="server">Best cell</button>
+          <button data-mode="sinr">SINR</button>
+          <button data-mode="rsrp">RSRP</button>
+        </div>
+        <label class="switch-row compact"><span>Radio links &amp; data packets</span><input type="checkbox" class="switch" data-display="links" checked /></label>
+        <label class="switch-row compact"><span>Cell labels</span><input type="checkbox" class="switch" data-display="labels" checked /></label>
+        <label class="switch-row compact"><span>Coverage domes</span><input type="checkbox" class="switch" data-display="domes" /></label>
+        <label class="switch-row compact"><span>Handover pop-ups</span><input type="checkbox" class="switch" data-display="popups" checked /></label>
+        <label class="switch-row compact"><span>Glow (bloom)</span><input type="checkbox" class="switch" data-display="bloom" checked /></label>
+        <label class="switch-row compact"><span>Auto-rotate camera</span><input type="checkbox" class="switch" data-display="rotate" /></label>
+      </section>
+    </aside>
+
+    <aside class="panel right glass" id="panel-right">
+      <section>
+        <h2><span class="ms">monitoring</span>Network KPIs</h2>
+        <div class="kpis">
+          <div class="kpi"><span class="kpi-label">Handovers</span><span class="kpi-value" id="kpi-ho">0</span><span class="kpi-sub" id="kpi-horate">0 / min</span></div>
+          <div class="kpi"><span class="kpi-label">HO success</span><span class="kpi-value" id="kpi-success">100%</span><span class="kpi-sub" id="kpi-fail">0 failed</span></div>
+          <div class="kpi"><span class="kpi-label">Ping-pong</span><span class="kpi-value" id="kpi-pp">0%</span><span class="kpi-sub" id="kpi-ppn">0 events</span></div>
+          <div class="kpi"><span class="kpi-label">Radio link failures</span><span class="kpi-value" id="kpi-rlf">0</span><span class="kpi-sub" id="kpi-rlfc">—</span></div>
+          <div class="kpi"><span class="kpi-label">Avg downlink</span><span class="kpi-value" id="kpi-thr">0</span><span class="kpi-sub" id="kpi-total">Mbps per phone</span></div>
+          <div class="kpi"><span class="kpi-label">Avg SINR</span><span class="kpi-value" id="kpi-sinr">0</span><span class="kpi-sub">dB · connected</span></div>
+        </div>
+      </section>
+
+      <section>
+        <div class="chart-head"><h3>Handovers &amp; failures per minute</h3><div class="chart-legend"><i style="--c: var(--primary)"></i>HO <i style="--c: var(--error)"></i>Fail</div></div>
+        <canvas class="chart" id="chart-ho" height="96"></canvas>
+        <div class="chart-head"><h3>Average downlink throughput</h3><div class="chart-legend"><i style="--c: var(--tertiary)"></i>Mbps</div></div>
+        <canvas class="chart" id="chart-thr" height="96"></canvas>
+      </section>
+
+      <section>
+        <h3>Phones per layer</h3>
+        <div class="share-bar" id="share-bar"></div>
+        <div class="share-legend" id="share-legend"></div>
+      </section>
+
+      <section>
+        <h3>Cell load</h3>
+        <div class="cells" id="cell-list"></div>
+      </section>
+
+      <section class="grow">
+        <div class="chart-head">
+          <h3>Signalling log</h3>
+          <div class="log-filter segmented small" id="log-filter">
+            <button data-filter="all" class="active">All</button>
+            <button data-filter="fail">Issues</button>
+          </div>
+        </div>
+        <ol class="log" id="log"></ol>
+      </section>
+    </aside>
+
+    <div class="toolbar glass" id="toolbar" role="toolbar" aria-label="Tools">
+      <button data-tool="select" class="active" title="Select / drag towers (V)"><span class="ms">near_me</span></button>
+      <span class="divider"></span>
+      <button data-tool="LTE" class="tool-LTE" title="Place a 4G LTE eNB"><span class="ms">cell_tower</span><b>4G</b></button>
+      <button data-tool="NR" class="tool-NR" title="Place a 5G NR gNB"><span class="ms">cell_tower</span><b>5G</b></button>
+      <button data-tool="MMW" class="tool-MMW" title="Place a 5G mmWave small cell"><span class="ms">wifi_tethering</span><b>mmW</b></button>
+    </div>
+    <div class="hint glass" id="hint" hidden></div>
+
+    <div class="legend glass" id="legend">
+      <div class="legend-techs">
+        <span class="chip tech-LTE"><i></i>4G LTE</span>
+        <span class="chip tech-NR"><i></i>5G NR</span>
+        <span class="chip tech-MMW"><i></i>mmWave</span>
+      </div>
+      <div class="legend-scale" id="legend-scale" hidden>
+        <div class="scale-bar" id="scale-bar"></div>
+        <div class="scale-labels"><span id="scale-min"></span><span id="scale-title"></span><span id="scale-max"></span></div>
+      </div>
+    </div>
+
+    <div class="inspector glass" id="inspector" hidden></div>
+    <div class="tower-card glass" id="tower-card" hidden></div>
+    <div class="toasts" id="toasts"></div>
+
+    <dialog id="help" class="glass">
+      <form method="dialog">
+        <header>
+          <h2><span class="ms">school</span>How the simulator works</h2>
+          <button class="icon-btn" value="close" title="Close"><span class="ms">close</span></button>
+        </header>
+        <div class="help-grid">
+          <article>
+            <h3><span class="ms">cell_tower</span>Three radio layers</h3>
+            <p><b class="t-LTE">4G LTE</b> macro cells on 1.8 GHz cover the whole city. <b class="t-NR">5G NR</b> mid-band cells on 3.5 GHz use massive MIMO for more capacity. <b class="t-MMW">mmWave</b> small cells on 26 GHz carry gigabit speeds but buildings block them almost completely.</p>
+          </article>
+          <article>
+            <h3><span class="ms">wifi</span>Radio propagation</h3>
+            <p>Path loss follows the 3GPP TR 38.901 UMa / UMi models. Every building is ray-tested in 3D for line of sight. Shadow fading is spatially correlated, and measurements pass through a layer-3 filter.</p>
+          </article>
+          <article>
+            <h3><span class="ms">swap_calls</span>A3 handover</h3>
+            <p>A phone hands over when a neighbour beats its serving cell by <i>offset + hysteresis</i> for the whole <i>time-to-trigger</i>. Cell individual offsets let you prefer one layer, for example "use 5G whenever it is decent".</p>
+          </article>
+          <article>
+            <h3><span class="ms">report</span>Failures</h3>
+            <p>If SINR stays below −8 dB for T310 the radio link fails. Each failure is classified the way 3GPP mobility robustness optimisation does it: <i>too late</i>, <i>too early</i>, <i>wrong cell</i> or <i>coverage hole</i>. A quick return to the previous cell counts as <i>ping-pong</i>.</p>
+          </article>
+        </div>
+        <h3 class="kbd-title">Controls</h3>
+        <ul class="kbd-list">
+          <li><kbd>Click</kbd> a phone or tower to inspect it</li>
+          <li><kbd>Drag</kbd> a tower to move it, or use the toolbar to place new ones</li>
+          <li><kbd>Space</kbd> pause · <kbd>1</kbd>–<kbd>4</kbd> speed · <kbd>M</kbd> cycle coverage map</li>
+          <li><kbd>F</kbd> follow the selected phone · <kbd>Esc</kbd> deselect</li>
+          <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> drive a phone after pressing <i>Take control</i></li>
+        </ul>
+      </form>
+    </dialog>
+
+    <script type="module" src="src/main.js"></script>
+  </body>
+</html>
